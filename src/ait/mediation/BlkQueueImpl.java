@@ -16,12 +16,12 @@ public class BlkQueueImpl<T> implements BlkQueue<T> {
             try {
                 wait();
             } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                return;
+                throw new RuntimeException(e);
+
             }
         }
-        queue.addLast(message);
-        notifyAll();
+        queue.add(message);
+        notify();
     }
 
     @Override
@@ -30,11 +30,10 @@ public class BlkQueueImpl<T> implements BlkQueue<T> {
             try {
                 wait();
             } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                return null;
+                throw new RuntimeException(e);
             }
         }
-        T message = queue.removeFirst();
+        T message = queue.poll();
         notifyAll();
         return message;
     }
