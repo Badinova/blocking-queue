@@ -1,40 +1,57 @@
 package ait.mediation;
 
 import java.util.LinkedList;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class BlkQueueImpl<T> implements BlkQueue<T> {
     private final LinkedList<T> queue = new LinkedList<>();
     private final int maxSize;
+
+    private final Lock mutex = new ReentrantLock();
+    private final Condition notFull = mutex.newCondition();
+    private final Condition notEmpty = mutex.newCondition();
+
 
     public BlkQueueImpl(int maxSize) {
         this.maxSize = maxSize;
     }
 
     @Override
-    public synchronized void push(T message) {
-        while (queue.size() >= maxSize) {
-            try {
-                wait();
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-
+    public void push(T message) {
+        mutex.lock();
+        try {
+            while (queue.size() >= maxSize) {
+                try {
+                    notFull.await();
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
             }
+            queue.addLast(message);
+            notEmpty.signal();
+        } finally {
+            mutex.unlock();
         }
-        queue.add(message);
-        notify();
     }
 
     @Override
-    public synchronized T pop() {
-        while (queue.isEmpty()) {
-            try {
-                wait();
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
+    public T pop() {
+        mutex.lock();
+        try {
+            while (queue.isEmpty()) {
+                try {
+                    notEmpty.await();
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
             }
+            T message = queue.removeFirst();
+            notFull.signal();
+            return message;
+        } finally {
+            mutex.unlock();
         }
-        T message = queue.poll();
-        notifyAll();
-        return message;
     }
 }
